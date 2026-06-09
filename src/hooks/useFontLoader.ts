@@ -6,21 +6,93 @@ import { useFontStore } from '../store/useFontStore';
 const loadedPromises = new Map<string, Promise<FontPerformance>>();
 const appendedLinks = new Set<string>();
 
-async function estimateFileSize(cssUrl: string, family: string): Promise<number> {
+interface ResourceMetrics {
+  transferBytes: number;
+  durationMs: number;
+}
+
+function collectResourceMetrics(family: string, cssUrl: string): ResourceMetrics {
+  const slug = family.toLowerCase().replace(/\s+/g, '');
+  let totalBytes = 0;
+  let maxDuration = 0;
+
   try {
-    const cssRes = await fetch(cssUrl);
-    if (!cssRes.ok) return 0;
-    const css = await cssRes.text();
-    const match = css.match(/url\(([^)]+)\)/);
-    if (!match) return 0;
-    const woffUrl = match[1].replace(/^['"]|['"]$/g, '');
-    const head = await fetch(woffUrl, { method: 'HEAD' });
-    const len = head.headers.get('content-length');
-    if (len) return Math.round(parseInt(len, 10) / 1024);
+    const allEntries = performance.getEntriesByType('resource');
+    for (const entry of allEntries) {
+      const name = entry.name;
+      const matches =
+        name.includes('fonts.googleapis.com/css2') &&
+        (name.includes(family.replace(/\s+/g, '+')) ||
+          name.includes(slug) ||
+          cssUrl.includes(name) ||
+          name.includes(cssUrl.slice(cssUrl.indexOf('family=')))) ||
+        (name.includes('fonts.gstatic.com') &&
+          (name.includes(slug) || name.includes(family.replace(/\s+/g, ''))));
+      if (!matches) continue;
+
+      const timing = entry as PerformanceResourceTiming;
+      const size = timing.transferSize > 0
+        ? timing.transferSize
+        : timing.encodedBodySize > 0
+          ? timing.encodedBodySize
+          : 0;
+      const dur = timing.duration > 0 ? timing.duration : 0;
+      totalBytes += size;
+      if (dur > maxDuration) maxDuration = dur;
+    }
+
+    const perfNames: PerformanceEntry[] = [];
+    try {
+      const cssEntries = performance.getEntriesByName(cssUrl);
+      perfNames.push(...cssEntries);
+    } catch { /* empty */ }
+
+    if (perfNames.length === 0) {
+      const urlBase = cssUrl.split('&')[0];
+      const allRes = performance.getEntriesByType('resource');
+      for (const r of allRes) {
+        if (r.name.startsWith(urlBase) || r.name.includes('family=' + slug)) {
+          perfNames.push(r);
+        }
+      }
+    }
+
+    for (const entry of perfNames) {
+      const timing = entry as PerformanceResourceTiming;
+      const size = timing.transferSize > 0
+        ? timing.transferSize
+        : timing.encodedBodySize > 0
+          ? timing.encodedBodySize
+          : 0;
+      const dur = timing.duration > 0 ? timing.duration : 0;
+      if (size > totalBytes) totalBytes = size;
+      if (dur > maxDuration) maxDuration = dur;
+    }
   } catch {
     /* ignore */
   }
-  return 20 + Math.round((family.length % 5) * 8);
+
+  return { transferBytes: totalBytes, durationMs: maxDuration };
+}
+
+async function waitForResourceTiming(
+  family: string,
+  cssUrl: string,
+  timeoutMs: number,
+): Promise<ResourceMetrics> {
+  const started = performance.now();
+  const pollInterval = 80;
+  let last: ResourceMetrics = { transferBytes: 0, durationMs: 0 };
+
+  while (performance.now() - started < timeoutMs) {
+    const metrics = collectResourceMetrics(family, cssUrl);
+    if (metrics.transferBytes > 0 || metrics.durationMs > 0) {
+      return metrics;
+    }
+    if (metrics.transferBytes > last.transferBytes) last = metrics;
+    await new Promise((r) => setTimeout(r, pollInterval));
+  }
+  return last;
 }
 
 export function loadFont(font: FontItem, weights?: number[]): Promise<FontPerformance> {
@@ -59,21 +131,39 @@ export function loadFont(font: FontItem, weights?: number[]): Promise<FontPerfor
       /* ignore */
     }
 
-    const loadTimeMs = Math.round(performance.now() - start);
+    const fallbackMs = Math.round(performance.now() - start);
     const variantCount = font.variants.length;
 
     let fileSizeKb = 0;
+    let loadTimeMs = fallbackMs;
     try {
       const sizeKey = `__fsize_${font.family}`;
       const cached = sessionStorage.getItem(sizeKey);
       if (cached) {
-        fileSizeKb = parseInt(cached, 10) || 0;
+        try {
+          const parsed = JSON.parse(cached) as { kb: number; dur: number };
+          fileSizeKb = parsed.kb || 0;
+          if (parsed.dur && parsed.dur > 0) loadTimeMs = parsed.dur;
+        } catch {
+          fileSizeKb = parseInt(cached, 10) || 0;
+        }
       } else {
-        fileSizeKb = await estimateFileSize(cssUrl, font.family);
-        sessionStorage.setItem(sizeKey, String(fileSizeKb));
+        const metrics = await waitForResourceTiming(font.family, cssUrl, 1500);
+        if (metrics.transferBytes > 0) {
+          fileSizeKb = Math.round(metrics.transferBytes / 1024);
+        }
+        if (metrics.durationMs > 0) {
+          loadTimeMs = Math.max(loadTimeMs, Math.round(metrics.durationMs));
+        }
+        if (fileSizeKb > 0 || loadTimeMs > 0) {
+          sessionStorage.setItem(
+            sizeKey,
+            JSON.stringify({ kb: fileSizeKb, dur: loadTimeMs }),
+          );
+        }
       }
     } catch {
-      fileSizeKb = 20;
+      fileSizeKb = 0;
     }
 
     const perf: FontPerformance = {
