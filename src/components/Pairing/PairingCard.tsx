@@ -1,8 +1,7 @@
-import { Sparkles, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import type { PairingScore } from '../../utils/pairingAlgorithm';
 import { CATEGORY_LABELS } from '../../types/font';
 import { useFontLoader } from '../../hooks/useFontLoader';
-import { cn } from '../../lib/utils';
 
 interface Props {
   score: PairingScore;

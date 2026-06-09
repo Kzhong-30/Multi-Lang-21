@@ -42,12 +42,12 @@ export function PairingRecommend({ variant = 'fullwidth' }: Props) {
           </div>
           <button
             onClick={() => setShowFavoritesDrawer(true)}
-            className="flex h-8 w-8 items-center justify-center rounded-md border border-zinc-800 bg-zinc-900/60 text-zinc-400 transition hover:border-mint/40 hover:text-mint"
+            className="relative flex h-8 w-8 items-center justify-center rounded-md border border-zinc-800 bg-zinc-900/60 text-zinc-400 transition hover:border-mint/40 hover:text-mint"
             title="打开收藏夹"
           >
             <Bookmark className="h-3.5 w-3.5" />
             {favorites.length > 0 && (
-              <span className="absolute -mt-3 -mr-3 rounded-full bg-mint px-1 text-[8px] font-semibold text-zinc-950" style={{ marginLeft: '16px', marginTop: '-8px' }}>
+              <span className="absolute top-0 right-0 flex h-4 min-w-[16px] -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-full bg-mint px-1 text-[9px] font-semibold leading-none text-zinc-950">
                 {favorites.length}
               </span>
             )}

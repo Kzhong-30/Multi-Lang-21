@@ -2,7 +2,6 @@ import {
   BookmarkPlus,
   Bookmark,
   Code2,
-  Save,
   RotateCcw,
   Heart,
 } from 'lucide-react';
@@ -28,8 +27,6 @@ export default function Home({ fontsLoading }: Props) {
   const fontA = useFontStore((s) => s.fontA);
   const fontB = useFontStore((s) => s.fontB);
   const compareMode = useFontStore((s) => s.compareMode);
-  const styleA = useFontStore((s) => s.styleA);
-  const styleB = useFontStore((s) => s.styleB);
   const setStyleA = useFontStore((s) => s.setStyleA);
   const setStyleB = useFontStore((s) => s.setStyleB);
   const saveCurrentPair = useFontStore((s) => s.saveCurrentPair);
