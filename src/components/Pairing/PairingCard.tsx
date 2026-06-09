@@ -2,14 +2,16 @@ import { Sparkles, ArrowRight } from 'lucide-react';
 import type { PairingScore } from '../../utils/pairingAlgorithm';
 import { CATEGORY_LABELS } from '../../types/font';
 import { useFontLoader } from '../../hooks/useFontLoader';
+import { cn } from '../../lib/utils';
 
 interface Props {
   score: PairingScore;
   rank: number;
   onClick: () => void;
+  compact?: boolean;
 }
 
-export function PairingCard({ score, rank, onClick }: Props) {
+export function PairingCard({ score, rank, onClick, compact }: Props) {
   useFontLoader(score.font, [400, 700]);
 
   const rating =
@@ -20,6 +22,40 @@ export function PairingCard({ score, rank, onClick }: Props) {
       : score.score >= 0.7
         ? 'bg-accent/15 text-accent'
         : 'bg-zinc-800 text-zinc-400';
+
+  if (compact) {
+    return (
+      <button
+        onClick={onClick}
+        className="group flex w-full items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900/60 p-2.5 text-left transition-all duration-200 hover:border-zinc-700 hover:bg-zinc-900"
+      >
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-zinc-800/70">
+          <span
+            className="text-[13px] leading-none text-zinc-300"
+            style={{ fontFamily: `'${score.font.family}', ${score.font.category}` }}
+          >
+            Aa
+          </span>
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <span className="truncate text-[12px] font-medium text-zinc-100">
+              {score.font.family}
+            </span>
+            <span className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] ${ratingColor}`}>
+              {Math.round(score.score * 100)}
+            </span>
+          </div>
+          <div className="mt-0.5 flex items-center justify-between">
+            <span className="text-[10px] text-zinc-500">
+              #{rank + 1} · {CATEGORY_LABELS[score.font.category]}
+            </span>
+            <ArrowRight className="h-3 w-3 text-zinc-600 transition group-hover:text-accent" />
+          </div>
+        </div>
+      </button>
+    );
+  }
 
   return (
     <button

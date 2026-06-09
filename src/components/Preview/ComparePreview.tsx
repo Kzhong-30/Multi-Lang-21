@@ -20,7 +20,7 @@ export function ComparePreview() {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+    <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
       <PreviewCanvas
         label="字体 A · 标题"
         font={fontA}

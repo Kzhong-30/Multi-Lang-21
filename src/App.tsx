@@ -7,7 +7,7 @@ import { ApiKeyBanner, loadApiKey } from './components/Banner/ApiKeyBanner';
 function App() {
   const init = useFontStore((s) => s.init);
   const [apiKey, setApiKey] = useState<string>(() => loadApiKey());
-  useGoogleFonts(apiKey || undefined);
+  const { loading } = useGoogleFonts(apiKey || undefined);
 
   useEffect(() => {
     init();
@@ -17,7 +17,7 @@ function App() {
     <div className="flex h-screen w-screen flex-col overflow-hidden">
       <ApiKeyBanner apiKey={apiKey} onKeyChange={setApiKey} />
       <div className="min-h-0 flex-1 overflow-hidden">
-        <Home />
+        <Home fontsLoading={loading} />
       </div>
     </div>
   );
