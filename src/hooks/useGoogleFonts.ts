@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { FontItem } from '../types/font';
-import { FONT_DATASET } from '../data/fonts';
+import { FONT_DATASET, buildFiles, getVersion } from '../data/fonts';
 import { loadFontCache, saveFontCache } from '../utils/storage';
 import { useFontStore } from '../store/useFontStore';
 
@@ -19,7 +19,7 @@ export function useGoogleFonts(apiKey?: string) {
       try {
         if (apiKey) {
           try {
-            const cached = loadFontCache() as FontItem[] | null;
+            const cached = loadFontCache(apiKey) as FontItem[] | null;
             if (cached && Array.isArray(cached) && cached.length > 0) {
               setFonts(cached);
               setLoading(false);
@@ -29,11 +29,20 @@ export function useGoogleFonts(apiKey?: string) {
             if (res.ok) {
               const json = (await res.json()) as { items: FontItem[] };
               const items = json.items ?? [];
-              const enriched = items.map((f, i) => ({
-                ...f,
-                popularity: Math.max(1, 100 - i),
-              }));
-              saveFontCache(enriched);
+              const enriched: FontItem[] = items.map((f, i) => {
+                const version = f.version || getVersion(f.family);
+                const rawFiles =
+                  f.files && typeof f.files === 'object' && Object.keys(f.files).length > 0
+                    ? f.files
+                    : buildFiles(f.family, f.variants, version);
+                return {
+                  ...f,
+                  version,
+                  files: rawFiles,
+                  popularity: Math.max(1, 100 - i),
+                };
+              });
+              saveFontCache(enriched, apiKey);
               if (!cancelled) {
                 setFonts(enriched);
                 setLoading(false);

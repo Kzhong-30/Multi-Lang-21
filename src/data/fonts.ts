@@ -258,14 +258,93 @@ const DEFAULT_VARIANTS_MICRO = ['regular','700'];
 const RAW_FONTS: RawFont[] = [
 ];
 
-function getVersion(family: string, provided?: string): string {
+export function getVersion(family: string, provided?: string): string {
   if (provided) return provided;
   return FONT_VERSION_MAP[family] ?? 'v1';
 }
 
-function buildFiles(family: string, variants: string[], version: string): Record<string, string> {
+const SLUG_OVERRIDES: Record<string, string> = {
+  'Source Sans Pro': 'sourcesanspro',
+  'Source Sans 3': 'sourcesans3',
+  'Source Serif Pro': 'sourceserifpro',
+  'Source Serif 4': 'sourceserif4',
+  'Source Code Pro': 'sourcecodepro',
+  'Noto Sans': 'notosans',
+  'Noto Serif': 'notoserif',
+  'Noto Sans SC': 'notosanssc',
+  'Noto Sans TC': 'notosanstc',
+  'Noto Sans JP': 'notosansjp',
+  'Noto Sans KR': 'notosanskr',
+  'Noto Serif SC': 'notoserifsc',
+  'Noto Serif TC': 'notoseriftc',
+  'Noto Serif JP': 'notoserifjp',
+  'Noto Serif KR': 'notoserifkr',
+  'Noto Sans Mono': 'notosansmono',
+  'Noto Sans Arabic': 'notosansarabic',
+  'Noto Sans Hebrew': 'notosanshebrew',
+  'IBM Plex Sans': 'ibmplexsans',
+  'IBM Plex Serif': 'ibmplexserif',
+  'IBM Plex Mono': 'ibmplexmono',
+  'IBM Plex Sans Arabic': 'ibmplexsansarabic',
+  'IBM Plex Sans Hebrew': 'ibmplexsanshebrew',
+  'Space Grotesk': 'spacegrotesk',
+  'Space Mono': 'spacemono',
+  'Plus Jakarta Sans': 'plusjakartasans',
+  'DM Sans': 'dmsans',
+  'DM Serif Display': 'dmserifdisplay',
+  'DM Serif Text': 'dmseriftext',
+  'EB Garamond': 'ebgaramond',
+  'PT Sans': 'ptsans',
+  'PT Serif': 'ptserif',
+  'PT Mono': 'ptmono',
+  'B612 Mono': 'b612mono',
+  'Fira Sans': 'firasans',
+  'Fira Code': 'firacode',
+  'Fira Mono': 'firamono',
+  'Work Sans': 'worksans',
+  'Open Sans': 'opensans',
+  'Libre Baskerville': 'librebaskerville',
+  'Libre Franklin': 'librefranklin',
+  'Red Hat Display': 'redhatdisplay',
+  'Red Hat Text': 'redhattext',
+  'Red Hat Mono': 'redhatmono',
+  'Big Shoulders Display': 'bigshouldersdisplay',
+  'Big Shoulders Text': 'bigshoulderstext',
+  'JetBrains Mono': 'jetbrainsmono',
+  'Inter Tight': 'intertight',
+  'Cormorant Garamond': 'cormorantgaramond',
+  'Cormorant Infant': 'cormorantinfant',
+  'Cormorant Upright': 'cormorantupright',
+  'Cormorant SC': 'cormorantsc',
+  'League Spartan': 'leaguespartan',
+  'League Gothic': 'leaguegothic',
+  'Major Mono Display': 'majormonodisplay',
+  'Shadows Into Light': 'shadowsintolight',
+  'Shadows Into Light Two': 'shadowsintolighttwo',
+  'Patrick Hand': 'patrickhand',
+  'Patrick Hand SC': 'patrickhandsc',
+  'Dancing Script': 'dancingscript',
+  'ZCOOL KuaiLe': 'zcoolkuaile',
+  'ZCOOL XiaoWei': 'zcoolxiaowei',
+  'ZCOOL QingKe HuangYou': 'zcoolqingkehuangyou',
+  'Ma Shan Zheng': 'mashanzheng',
+  'Liu Jian Mao Cao': 'liujianmaocao',
+  'Zhi Mang Xing': 'zhimangxing',
+  'Long Cang': 'longcang',
+};
+
+export function googleFontsSlug(family: string): string {
+  if (SLUG_OVERRIDES[family]) return SLUG_OVERRIDES[family];
+  return family
+    .replace(/[^\p{L}\p{N}]/gu, '')
+    .toLowerCase();
+}
+
+export { SLUG_OVERRIDES };
+
+export function buildFiles(family: string, variants: string[], version: string): Record<string, string> {
   const base = 'https://fonts.gstatic.com/s';
-  const slug = family.toLowerCase().replace(/\s+/g, '');
+  const slug = googleFontsSlug(family);
   const files: Record<string, string> = {};
   variants.forEach((v) => {
     const weight = v === 'regular' ? '400' : v;
@@ -1562,7 +1641,7 @@ export const FONT_DATASET: FontItem[] = RAW_FONTS.map(
       category: f.category,
       variants: f.variants,
       subsets: ['latin'],
-      files: buildFiles(f.family, f.variants, version),
+      files: {},
       version,
       lastModified: '2025-01-01',
       popularity: f.popularity ?? 50,

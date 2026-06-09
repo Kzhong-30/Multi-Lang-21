@@ -3,12 +3,14 @@ import type { FontPair, FontItem } from '../types/font';
 import {
   CACHE_TTL,
   addFavorite,
+  fontCacheKeyFor,
   hasFavorite,
   loadFavorites,
   loadFontCache,
   removeFavorite,
   saveFavorites,
   saveFontCache,
+  shortHash,
 } from './storage';
 
 function mkFont(family: string): FontItem {
@@ -184,5 +186,38 @@ describe('storage - font cache', () => {
       });
     expect(() => saveFontCache({ a: 1 })).not.toThrow();
     spy.mockRestore();
+  });
+
+  it('case 11: shortHash 是确定性函数，相同输入相同输出，不同输入大概率不同', () => {
+    const h1 = shortHash('AIzaSyABC123');
+    const h2 = shortHash('AIzaSyABC123');
+    const h3 = shortHash('AIzaSyXYZ999');
+    expect(h1).toBe(h2);
+    expect(h1).not.toBe(h3);
+    expect(h1.length).toBeGreaterThanOrEqual(4);
+    expect(h1).toMatch(/^[0-9a-f]+$/);
+    expect(shortHash('')).toHaveLength(8);
+  });
+
+  it('case 12: loadFontCache / saveFontCache 对不同 apiKey 严格隔离（Key 变更强制失效缓存）', () => {
+    const keyA = 'AIzaSyKEY-FOR-A';
+    const keyB = 'AIzaSyKEY-FOR-B';
+    const dataA = [{ family: 'Inter' }, { family: 'Roboto' }];
+    const dataB = [{ family: 'Lora' }];
+
+    saveFontCache(dataA, keyA);
+    saveFontCache(dataB, keyB);
+
+    expect(loadFontCache(keyA)).toEqual(dataA);
+    expect(loadFontCache(keyB)).toEqual(dataB);
+    expect(loadFontCache(null)).toBeNull();
+    expect(loadFontCache(undefined)).toBeNull();
+    expect(loadFontCache('AIzaSyTHIRD-KEY')).toBeNull();
+
+    // fontCacheKeyFor 也必须区分不同 Key
+    expect(fontCacheKeyFor(keyA)).not.toBe(fontCacheKeyFor(keyB));
+    expect(fontCacheKeyFor(keyA)).toContain('-k');
+    expect(fontCacheKeyFor(null)).toContain('-fallback');
+    expect(fontCacheKeyFor(undefined)).toContain('-fallback');
   });
 });

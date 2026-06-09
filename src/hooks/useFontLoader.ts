@@ -9,26 +9,33 @@ const appendedLinks = new Set<string>();
 interface ResourceMetrics {
   transferBytes: number;
   durationMs: number;
+  gstaticHit: boolean;
 }
+
+const MIN_FONT_BYTES = 30 * 1024;
 
 function collectResourceMetrics(family: string, cssUrl: string): ResourceMetrics {
   const slug = family.toLowerCase().replace(/\s+/g, '');
   let totalBytes = 0;
   let maxDuration = 0;
+  let gstaticHit = false;
 
   try {
     const allEntries = performance.getEntriesByType('resource');
     for (const entry of allEntries) {
       const name = entry.name;
-      const matches =
+      const isGstatic = name.includes('fonts.gstatic.com');
+      const matchesGstatic =
+        isGstatic &&
+        (name.includes(slug) || name.includes(family.replace(/\s+/g, '')));
+      const matchesCss =
         name.includes('fonts.googleapis.com/css2') &&
         (name.includes(family.replace(/\s+/g, '+')) ||
           name.includes(slug) ||
           cssUrl.includes(name) ||
-          name.includes(cssUrl.slice(cssUrl.indexOf('family=')))) ||
-        (name.includes('fonts.gstatic.com') &&
-          (name.includes(slug) || name.includes(family.replace(/\s+/g, ''))));
-      if (!matches) continue;
+          name.includes(cssUrl.slice(cssUrl.indexOf('family='))));
+      if (!matchesGstatic && !matchesCss) continue;
+      if (matchesGstatic) gstaticHit = true;
 
       const timing = entry as PerformanceResourceTiming;
       const size = timing.transferSize > 0
@@ -72,7 +79,7 @@ function collectResourceMetrics(family: string, cssUrl: string): ResourceMetrics
     /* ignore */
   }
 
-  return { transferBytes: totalBytes, durationMs: maxDuration };
+  return { transferBytes: totalBytes, durationMs: maxDuration, gstaticHit };
 }
 
 async function waitForResourceTiming(
@@ -82,11 +89,11 @@ async function waitForResourceTiming(
 ): Promise<ResourceMetrics> {
   const started = performance.now();
   const pollInterval = 80;
-  let last: ResourceMetrics = { transferBytes: 0, durationMs: 0 };
+  let last: ResourceMetrics = { transferBytes: 0, durationMs: 0, gstaticHit: false };
 
   while (performance.now() - started < timeoutMs) {
     const metrics = collectResourceMetrics(family, cssUrl);
-    if (metrics.transferBytes > 0 || metrics.durationMs > 0) {
+    if (metrics.gstaticHit || metrics.transferBytes >= MIN_FONT_BYTES) {
       return metrics;
     }
     if (metrics.transferBytes > last.transferBytes) last = metrics;
@@ -137,7 +144,8 @@ export function loadFont(font: FontItem, weights?: number[]): Promise<FontPerfor
     let fileSizeKb = 0;
     let loadTimeMs = fallbackMs;
     try {
-      const sizeKey = `__fsize_${font.family}`;
+      const weightsKey = (useWeights ?? []).slice().sort((a, b) => a - b).join('-');
+      const sizeKey = `__fsize_${font.family}::${weightsKey}`;
       const cached = sessionStorage.getItem(sizeKey);
       if (cached) {
         try {
@@ -149,7 +157,7 @@ export function loadFont(font: FontItem, weights?: number[]): Promise<FontPerfor
         }
       } else {
         const metrics = await waitForResourceTiming(font.family, cssUrl, 1500);
-        if (metrics.transferBytes > 0) {
+        if (metrics.transferBytes >= MIN_FONT_BYTES || metrics.gstaticHit) {
           fileSizeKb = Math.round(metrics.transferBytes / 1024);
         }
         if (metrics.durationMs > 0) {
